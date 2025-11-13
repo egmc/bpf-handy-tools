@@ -17,7 +17,7 @@ BEGIN
 
 // プロセス実行(起動)を監視 (cronから実行されたもののみ)
 tracepoint:sched:sched_process_exec
-/str(comm, 3) == "php"/
+/comm == "php"/
 {
     $task = (struct task_struct *)curtask;
     $is_from_cron = 0;
