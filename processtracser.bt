@@ -15,16 +15,20 @@ BEGIN
     printf("%-8s %-20s %-8s %-8s %s\n", "TIME", "EVENT", "PID", "PPID", "COMMAND");
 }
 
-// プロセス実行(起動)を監視
+// プロセス実行(起動)を監視 (cronから実行されたもののみ)
 tracepoint:sched:sched_process_exec
+/str(comm, 3) == "php"/
 {
+    $task = (struct task_struct *)curtask;
+    $is_from_cron = 0;
+
     $pid = pid;
     $ppid = args->old_pid;
 
     // コマンドラインを取得 (/proc/<pid>/cmdline から読み取り)
     printf("%-8s %-20s %-8d %-8d %s",
            strftime("%H:%M:%S", nsecs),
-           "EXEC",
+           "EXEC(from cron)",
            $pid,
            $ppid,
            str(args->filename));
@@ -32,6 +36,7 @@ tracepoint:sched:sched_process_exec
     // コマンドライン引数を取得
     system("tr '\\0' ' ' </proc/%d/cmdline", $pid);
     printf("\n");
+
 }
 
 // プロセス終了を監視
