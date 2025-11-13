@@ -1,0 +1,49 @@
+#!/usr/bin/env bpftrace
+
+#ifndef BPFTRACE_HAVE_BTF
+#include <linux/sched.h>
+#endif
+
+/*
+ * プロセスの起動と終了を監視するbpftraceスクリプト
+ * 起動時にはコマンドライン全体を取得して表示
+ */
+
+BEGIN
+{
+    printf("プロセス監視を開始します...\n");
+    printf("%-8s %-20s %-8s %-8s %s\n", "TIME", "EVENT", "PID", "PPID", "COMMAND");
+}
+
+// プロセス実行(起動)を監視
+tracepoint:sched:sched_process_exec
+{
+    $pid = pid;
+    $ppid = args->old_pid;
+
+    // コマンドラインを取得 (/proc/<pid>/cmdline から読み取り)
+    printf("%-8s %-20s %-8d %-8d %s",
+           strftime("%H:%M:%S", nsecs),
+           "EXEC",
+           $pid,
+           $ppid,
+           str(args->filename));
+
+    // コマンドライン引数を取得
+    system("tr '\\0' ' ' </proc/%d/cmdline", $pid);
+    printf("\n");
+}
+
+// プロセス終了を監視
+tracepoint:sched:sched_process_exit
+{
+    $task = (struct task_struct *)curtask;
+    if ($task->pid == $task->tgid) {
+        printf("- %15s %-7d exit(%d) %s\n", strftime("%H:%M:%S.%f", nsecs), pid, $task->exit_code >> 8, comm);
+    }
+}
+
+END
+{
+    printf("\n監視を終了します\n");
+}
