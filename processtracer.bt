@@ -1,4 +1,4 @@
-#!/usr/bin/env bpftrace
+#!/usr/bin/bpftrace --unsafe
 
 #ifndef BPFTRACE_HAVE_BTF
 #include <linux/sched.h>
@@ -12,7 +12,7 @@
 BEGIN
 {
     printf("プロセス監視を開始します...\n");
-    printf("%-8s %-20s %-8s %-8s %s\n", "TIME", "EVENT", "PID", "PPID", "COMMAND");
+    printf("%-8s %-20s %-8s %-8s %-8s %s\n", "TIME", "EVENT", "PID", "ELAPSED_SEC", "COMMAND", "CODE");
 }
 
 // プロセス実行(起動)を監視 (cronから実行されたもののみ)
@@ -20,21 +20,23 @@ tracepoint:sched:sched_process_exec
 /comm == "php"/
 {
     $task = (struct task_struct *)curtask;
-    $is_from_cron = 0;
 
     $pid = pid;
-    $ppid = args->old_pid;
+
+    // not availabe with lernel 5.15.0
+    //printf("cmdpath: %s", args->filename);
+
 
     // プロセスIDをキー、現在時刻を値にしてmapを更新
     @start_time[$pid] = nsecs;
 
+    time("%H:%M:%S  ");
     // コマンドラインを取得 (/proc/<pid>/cmdline から読み取り)
-    printf("%-8s %-20s %-8d %-8d %s",
-           strftime("%H:%M:%S", nsecs),
+    printf("%-20s %-8d %-8s %s / ",
            "EXEC",
            $pid,
-           $ppid,
-           str(args->filename));
+           "",
+           comm);
 
     // コマンドライン引数を取得
     system("tr '\\0' ' ' </proc/%d/cmdline", $pid);
@@ -51,12 +53,16 @@ tracepoint:sched:sched_process_exit
         if (@start_time[pid]) {
             $duration_ns = nsecs - @start_time[pid];
             $duration_sec = $duration_ns / 1000000000;
-            printf("- %15s %-7d exit(%d) %s (実行時間: %d秒)\n",
-                   strftime("%H:%M:%S.%f", nsecs),
+            time("%H:%M:%S  ");
+            printf("%-20s %-8d %-8d %s %d",
+            //printf("%d %-7d exit(%d) %s (実行時間: %d秒)\n",
+                   "EXIT",
                    pid,
-                   $task->exit_code >> 8,
+                   $duration_sec,
                    comm,
-                   $duration_sec);
+                   $task->exit_code >> 8
+            );
+            printf("\n");
             // 終了処理でmapを削除
             delete(@start_time[pid]);
         }
