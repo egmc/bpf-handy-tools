@@ -25,10 +25,13 @@ tracepoint:sched:sched_process_exec
     $pid = pid;
     $ppid = args->old_pid;
 
+    // プロセスIDをキー、現在時刻を値にしてmapを更新
+    @start_time[$pid] = nsecs;
+
     // コマンドラインを取得 (/proc/<pid>/cmdline から読み取り)
     printf("%-8s %-20s %-8d %-8d %s",
            strftime("%H:%M:%S", nsecs),
-           "EXEC(from cron)",
+           "EXEC",
            $pid,
            $ppid,
            str(args->filename));
@@ -44,11 +47,25 @@ tracepoint:sched:sched_process_exit
 {
     $task = (struct task_struct *)curtask;
     if ($task->pid == $task->tgid) {
-        printf("- %15s %-7d exit(%d) %s\n", strftime("%H:%M:%S.%f", nsecs), pid, $task->exit_code >> 8, comm);
+        // プロセスIDをキーにmapが存在した場合に時刻を取り出す
+        if (@start_time[pid]) {
+            $duration_ns = nsecs - @start_time[pid];
+            $duration_sec = $duration_ns / 1000000000;
+            printf("- %15s %-7d exit(%d) %s (実行時間: %d秒)\n",
+                   strftime("%H:%M:%S.%f", nsecs),
+                   pid,
+                   $task->exit_code >> 8,
+                   comm,
+                   $duration_sec);
+            // 終了処理でmapを削除
+            delete(@start_time[pid]);
+        }
     }
 }
 
 END
 {
     printf("\n監視を終了します\n");
+    // 残っているmapエントリをクリア
+    clear(@start_time);
 }
