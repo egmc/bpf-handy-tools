@@ -15,12 +15,9 @@ BEGIN
     printf("%-8s %-20s %-8s %-8s %-8s %s\n", "TIME", "EVENT", "PID", "ELAPSED_SEC", "COMMAND", "CODE");
 }
 
-// プロセス実行(起動)を監視 (cronから実行されたもののみ)
 tracepoint:sched:sched_process_exec
 /comm == "php"/
 {
-    $task = (struct task_struct *)curtask;
-
     $pid = pid;
 
     // not availabe with lernel 5.15.0
@@ -46,6 +43,7 @@ tracepoint:sched:sched_process_exec
 
 // プロセス終了を監視
 tracepoint:sched:sched_process_exit
+/comm == "php"/
 {
     $task = (struct task_struct *)curtask;
     if ($task->pid == $task->tgid) {
