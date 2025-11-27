@@ -27,7 +27,7 @@ tracepoint:sched:sched_process_exec
     // プロセスIDをキー、現在時刻を値にしてmapを更新
     @start_time[$pid] = nsecs;
 
-    time("%H:%M:%S  ");
+    time("%Y-%m-%d %H:%M:%S  ");
     // コマンドラインを取得 (/proc/<pid>/cmdline から読み取り)
     printf("%-20s %-8d %-8s %s / ",
            "EXEC",
@@ -51,7 +51,7 @@ tracepoint:sched:sched_process_exit
         if (@start_time[pid]) {
             $duration_ns = nsecs - @start_time[pid];
             $duration_sec = $duration_ns / 1000000000;
-            time("%H:%M:%S  ");
+            time("%Y-%m-%d %H:%M:%S  ");
             printf("%-20s %-8d %-8d %s %d",
             //printf("%d %-7d exit(%d) %s (実行時間: %d秒)\n",
                    "EXIT",
